@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<!--上面是头部命名空间-->
+<!--mapper开始就是自己定义的了-->
+<mapper namespace="com.zjj.dao.BookDao">    <!--对应的mapper类的包路径-->
+
+    <select id="allBook" resultType="com.zjj.pojo.Book"> <!--传参是对象的话parameterType就写那个对象的路径,这边是int的type-->
+        select * from books
+    </select>
+
+</mapper>
