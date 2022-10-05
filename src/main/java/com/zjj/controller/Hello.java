@@ -44,4 +44,10 @@ public class Hello {
         result.setDate(new Date());
         return result;
     }
+
+    // 获取url名
+    @RequestMapping("/testPathVariable/{myName}")
+    public void testPathVariable(@PathVariable("myName") String name){
+        System.out.println(name);
+    }
 }

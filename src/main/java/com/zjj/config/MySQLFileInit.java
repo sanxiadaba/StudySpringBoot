@@ -1,78 +1,61 @@
 package com.zjj.config;
+// 初始化运行数据库
+// 注意，resource目录下的sql文件名要和连接的数据库名相等
+import com.zjj.Info.DataBaseInfo;
+import lombok.Data;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.DependsOn;
+import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.Objects;
-import java.util.Properties;
 
-// 初始数据库的文件
-// 也就是,只要在其他模块创建MySQLFileInit类或者调用run方法
-// 也就是触发类的加载,静态代码块里就会检查文件是否有指定的数据库连接
-// 没有的话就指定准备好的sql文件
-// 注
-// 因为这个功能很单一（都是static方法）,所以没有进行单例模式的实现
-// 想要连接的数据库与sql文件的前缀名要相同
-// 数据库配置文件默认是db.properties
-// db.properties里各个属性默认是
-// jdbc.driver jdbc.url jdbc.username jdbc.password
+
+@DependsOn("dataBaseInfo")
+@Component
+@Data
 public class MySQLFileInit {
 
-    public static void run(){
-        System.out.println("已初始化完成");
-    }
+    // 先将数据库的相关信息拿到
+    DataBaseInfo dataBaseInfo;
 
-    // 匿名静态代码块，在类加载时只执行一次
-    static {
-        init();
-    }
-
-    // 数据库配置文件的各个参数
-    // 要连接的数据库名，sql文件名前缀，注意前两者要保证相等
-    // 注意修改下面
-    private static final String databaseName="ssm_book";
-    private static final String dbFileName="db.properties";
+    // 对属性赋值
+    private  String databaseName;
     // 驱动
-    private static String driver;
+    private  String driver;
     // 要连接的地址
-    private static String url;
+    private  String url;
     // 用户名
-    private static String username;
+    private  String username;
     // 密码
-    private static String password;
+    private  String password;
 
-    // 初始化连接参数,从配置文件里获得最基本参数
-    private static void init() {
-        // 先从properties文件获取数据库文件
-        Properties properties = new Properties();
-        // 数据库配置的文件名
-        // 通过类加载器去读取对应的资源
-        try(InputStream inputStream = MySQLFileInit.class.getClassLoader().getResourceAsStream(dbFileName)){
-            properties.load(inputStream);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        driver = properties.getProperty("jdbc.driver");
-        url = properties.getProperty("jdbc.url");
-        username = properties.getProperty("jdbc.username");
-        password = properties.getProperty("jdbc.password");
-        // 看数据库是否在mysql中存在，不存在就创建
-        checkDatabase();
+    // 注入进来,并且赋值
+    @Autowired
+    public MySQLFileInit(DataBaseInfo dataBaseInfo) {
+        this.dataBaseInfo=dataBaseInfo;
+        this.databaseName=dataBaseInfo.getName();
+        this.driver=dataBaseInfo.getDrive();
+        this.url=dataBaseInfo.getUrl();
+        this.username=dataBaseInfo.getUsername();
+        this.password=dataBaseInfo.getPassword();
     }
+
 
     // 如果检查到数据库中没有对应的数据库表
     // 那就向数据库中自动执行sql文件
-    private static void checkDatabase()  {
+    // 实例化后执行
+    @PostConstruct
+    private void checkDatabase()  {
+        System.out.println("正在检查要连接数据库是否存在");
         // 注意将sql文件放在resources文件夹下,核心还是想获取项目目录
         String userDir= String.valueOf(Objects.requireNonNull(MySQLFileInit.class.getResource("/")).getPath());
         // 获取到sql文件的目录
@@ -97,9 +80,16 @@ public class MySQLFileInit {
             }
             // 如果原来的数据库里没有这个数据库
             if (!allDatabase.contains(databaseName)){
-                runSqlFile(path);
+                System.out.println("数据库不存在，开始自动生成");
+                try {
+                    runSqlFile(path);
+                }catch (Exception e){
+                    System.out.println("运行sql文件失败");
+                    e.printStackTrace();
+                    return;
+                }
                 // 初始化数据库完成
-                System.out.println("初始化数据库完成");
+                System.out.println("创建数据库完成");
             }else {
                 System.out.println("数据库已存在");
             }
@@ -109,38 +99,45 @@ public class MySQLFileInit {
         }
     }
 
-    private static void runSqlFile(String path) throws Exception {
+    private void runSqlFile(String path) throws Exception {
         // 先读取sql文件，使用; 分割存到一个列表里
         ArrayList<String> sqls=readFileByLines(path);
         // 再批量执行
+//        System.out.println(sqls);
+        for (String sql:sqls){
+            System.out.println(sql);
+        }
         batchDate(sqls);
+
     }
 
     // 批量执行sql文件
-    private static void batchDate(ArrayList<String> sqls) {
+    private void batchDate(ArrayList<String> sqls) throws SQLException {
+        System.out.println("开始批量执行sql");
         try {
             Class.forName(driver);
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
         try (Connection connection=DriverManager.getConnection(url.replace(databaseName,"mysql"), username, password)){
+            connection.setAutoCommit(false);
             Statement st = connection.createStatement();
             for (String sql : sqls) {
-                st.addBatch(sql);
+                System.out.println(sql);
+                st.execute(sql);
+                connection.commit();
             }
-            st.executeBatch();
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
 
     // 读取文件,以分号（;）为分割，将sql添加到一个列表里，之后再读取
-    private static  ArrayList<String> readFileByLines(String filePath) throws Exception {
+    private  ArrayList<String> readFileByLines(String filePath) throws Exception {
+        System.out.println("正在解析"+databaseName+".sql文件");
         ArrayList<String> listStr=new ArrayList<>();
         StringBuilder sb=new StringBuilder();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
                 // 这里是以utf-8 格式读取的
-                Files.newInputStream(Paths.get(filePath)), StandardCharsets.UTF_8))) {
+            Files.newInputStream(Paths.get(filePath)), StandardCharsets.UTF_8))) {
             // 读取指定目录下的文件
             String tempString;
             // 读取文件的基本逻辑是，flag判断缓冲区里面是否还有语句
