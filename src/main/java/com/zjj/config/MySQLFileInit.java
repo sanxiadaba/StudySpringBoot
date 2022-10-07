@@ -38,7 +38,7 @@ public class MySQLFileInit {
     // 密码
     private  String password;
 
-    // 注入进来,并且赋值
+    // 构造方法注入
     @Autowired
     public MySQLFileInit(DataBaseInfo dataBaseInfo) {
         this.dataBaseInfo=dataBaseInfo;

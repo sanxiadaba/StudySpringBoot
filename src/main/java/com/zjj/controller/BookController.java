@@ -1,5 +1,6 @@
 package com.zjj.controller;
 
+import com.zjj.annotation.OptLog;
 import com.zjj.pojo.Book;
 import com.zjj.service.BookService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,8 +20,10 @@ public class BookController {
         this.bookService = bookService;
     }
 
+    @OptLog(optType = "所有书籍")
     @RequestMapping("/getAllBook")
     public List<Book> getAllBook(){
+        String name="小明";
         return bookService.allBook();
     }
 }
